@@ -1,0 +1,38 @@
+{
+  "seed": 42,
+  "input": "..\\data\\processed_clean.csv",
+  "outputs": {
+    "processed_csv": "..\\data\\processed.csv",
+    "classes_txt": "..\\data\\classes.txt",
+    "splits_json": "..\\data\\splits.json",
+    "tfidf_vectorizer": "..\\models\\baseline\\tfidf.joblib"
+  },
+  "preprocessing": {
+    "normalization": "unicode NFKC, lowercase, trim spaces",
+    "field_used": "text_norm",
+    "keep_digits": true,
+    "avoid_aggressive_stemming": true
+  },
+  "labels": [
+    "cardiovascular",
+    "hepatorenal",
+    "neurological",
+    "oncological"
+  ],
+  "split": {
+    "test_size_approx": 0.15,
+    "n_splits_cv": 5,
+    "stratification": "MultilabelStratifiedKFold"
+  },
+  "tfidf": {
+    "enabled": true,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "max_features": 50000,
+    "min_df": 3,
+    "sublinear_tf": true,
+    "lowercase": false
+  }
+}

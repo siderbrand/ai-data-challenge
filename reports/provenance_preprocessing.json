@@ -1,0 +1,11 @@
+{
+  "source": "..\\data\\processed_clean.csv",
+  "rows": 3563,
+  "columns": [
+    "title",
+    "abstract",
+    "group",
+    "text"
+  ],
+  "note": "Archivo limpio exportado desde 01_eda.ipynb tras eliminar duplicados y fusionar por title."
+}
