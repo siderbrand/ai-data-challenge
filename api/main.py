@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CLASSES_PATH = Path(os.getenv("CLASSES_PATH", ROOT / "data" / "classes.txt"))
 
 
-DEFAULT_MODEL_DIR = ROOT / "models" / "experiments" / "linsvm_C1_C0.5_full5fold"
+DEFAULT_MODEL_DIR = ROOT / "models" / "experiments" / "linsvm_C1_cal_C0.5_full5fold"
 MODEL_DIR = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
 MODEL_PATH = MODEL_DIR / "model.joblib"
 VEC_PATH   = Path(os.getenv("VEC_PATH", MODEL_DIR / "tfidf.joblib"))
