@@ -4,19 +4,18 @@ from typing import List, Dict
 import joblib, json, numpy as np, pandas as pd
 from pathlib import Path
 
-# --- Rutas relativas a la raíz del repo ---
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 MODELS_EXP = ROOT / "models" / "experiments"
 MODELS_BASE = ROOT / "models" / "baseline"
 
-# --- Carga artefactos ---
+
 with open(DATA / "classes.txt") as f:
     CLASSES = [l.strip() for l in f if l.strip()]
 
 TFIDF = joblib.load(MODELS_BASE / "tfidf.joblib")
 
-# Cambia este nombre si tu carpeta ganadora es otra
+
 WINNER = "linsvm_C1_C0.5_full5fold"
 MODEL_DIR = MODELS_EXP / WINNER
 
@@ -42,7 +41,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(title="AI Data Challenge | Multilabel API", version="1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # en producción, lista de dominios
+    allow_origins=["*"], 
     allow_methods=["*"],
     allow_headers=["*"],
 )
