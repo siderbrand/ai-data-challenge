@@ -12,18 +12,22 @@ from pydantic import BaseModel, Field
 APP_TITLE = "AI Data Challenge | Multilabel API"
 APP_VERSION = "1.0"
 
-ROOT = Path(__file__).resolve().parents[1]
+# ------------------------------------------------------------------
+# Paths
+# ------------------------------------------------------------------
+ROOT = Path(__file__).resolve().parents[1]  # repo root
 
-CLASSES_PATH = Path(os.getenv("CLASSES_PATH", ROOT / "data" / "classes.txt"))
+CLASSES_PATH = ROOT / "data" / "classes.txt"
 
-
-DEFAULT_MODEL_DIR = ROOT / "models" / "experiments" / "ensemble_blend"
+# **GANADOR**: usa el experimento linsvm_C1_cal
+DEFAULT_MODEL_DIR = ROOT / "models" / "experiments" / "linsvm_C1_cal"
 MODEL_DIR = Path(os.getenv("MODEL_DIR", DEFAULT_MODEL_DIR))
+
 MODEL_PATH = MODEL_DIR / "model.joblib"
-VEC_PATH   = Path(os.getenv("VEC_PATH", MODEL_DIR / "tfidf.joblib"))
+VEC_PATH   = MODEL_DIR / "tfidf.joblib"        # <- vectorizador del MISMO experimento
 THR_PATH   = MODEL_DIR / "thresholds.json"
 
-
+# Short/long labels mapping (para UI V0)
 SHORT_TO_LONG = {
     "cardio": "cardiovascular",
     "hepato": "hepatorenal",
@@ -31,8 +35,10 @@ SHORT_TO_LONG = {
     "onco":   "oncological",
 }
 LONG_TO_SHORT = {v: k for k, v in SHORT_TO_LONG.items()}
-SHORT_ORDER = ["cardio", "hepato", "neuro", "onco"]  # orden en la UI
 
+# ------------------------------------------------------------------
+# Carga de artefactos
+# ------------------------------------------------------------------
 def _read_classes(path: Path) -> List[str]:
     if not path.exists():
         raise FileNotFoundError(f"No se encontró classes.txt en {path}")
@@ -44,7 +50,7 @@ def _read_classes(path: Path) -> List[str]:
 
 def _read_thresholds(path: Path, classes: List[str]) -> np.ndarray:
     if not path.exists():
-        # por si falta el archivo en prod: umbral seguro
+        # fallback seguro si no hay thresholds
         return np.full(len(classes), 0.5, dtype="float64")
     with open(path, "r", encoding="utf-8") as f:
         d = json.load(f)
@@ -55,7 +61,9 @@ MODEL = joblib.load(MODEL_PATH)
 VECT  = joblib.load(VEC_PATH)
 THR   = _read_thresholds(THR_PATH, CLASSES)
 
-# normalización simple (alineada con el TF-IDF de entrenamiento)
+# ------------------------------------------------------------------
+# Prepro ligero (alineado con el TF-IDF de entrenamiento)
+# ------------------------------------------------------------------
 _re_nonword = re.compile(r"[^a-z0-9\s]+")
 def normalize_text(s: str) -> str:
     s = (s or "").lower()
@@ -64,20 +72,20 @@ def normalize_text(s: str) -> str:
     return s
 
 def to_proba(model, Xsub) -> np.ndarray:
-    
+    """Devuelve probabilidades por clase (n_samples, n_classes)."""
     if hasattr(model, "predict_proba"):
         p = model.predict_proba(Xsub)
-        if isinstance(p, list):  # OvR devuelve lista por clase
+        # OneVsRest puede devolver lista de (n,2) por clase
+        if isinstance(p, list):
             p = np.column_stack([col[:, 1] for col in p])
         return p.astype("float64")
-    # fallback: sigmoide de decision_function (LinearSVC, etc.)
+    # Fallback: sigmoide sobre decision_function (no debería ocurrir con el cal)
     scores = model.decision_function(Xsub).astype("float64")
     return 1.0 / (1.0 + np.exp(-scores))
 
 def infer(texts: List[str]) -> List[Dict[str, Any]]:
     if not texts:
         return []
-
     texts_norm = [normalize_text(t) for t in texts]
     X = VECT.transform(texts_norm)
     proba = to_proba(MODEL, X)  # (n, C)
@@ -85,24 +93,26 @@ def infer(texts: List[str]) -> List[Dict[str, Any]]:
     results = []
     for i in range(proba.shape[0]):
         row = proba[i, :]
-        # labels con nombres largos (para trazabilidad)
+        # etiquetas (largas) superando umbral; si ninguna, argmax
         chosen_long = [CLASSES[j] for j, p in enumerate(row) if p >= THR[j]]
         if not chosen_long:
             chosen_long = [CLASSES[int(np.argmax(row))]]
 
-        # proba en ambos formatos
         proba_long  = {CLASSES[j]: float(row[j]) for j in range(len(CLASSES))}
         proba_short = {LONG_TO_SHORT[CLASSES[j]]: float(row[j]) for j in range(len(CLASSES))}
         labels_short = [LONG_TO_SHORT[c] for c in chosen_long]
 
         results.append({
-            "labels": chosen_long,        # largos
-            "labels_short": labels_short, # cortos p/ UI
-            "proba": proba_short,         # <── la UI de V0 debe leer ESTO
-            "proba_full": proba_long,     # y esto queda para debug/registro
+            "labels": chosen_long,        # nombres largos (trazabilidad)
+            "labels_short": labels_short, # nombres cortos para UI
+            "proba": proba_short,         # <- la UI V0 usa estas keys: cardio/hepato/neuro/onco
+            "proba_full": proba_long,     # para debug/registros
         })
     return results
 
+# ------------------------------------------------------------------
+# FastAPI
+# ------------------------------------------------------------------
 app = FastAPI(title=APP_TITLE, version=APP_VERSION)
 
 origins_env = os.getenv("ALLOWED_ORIGINS", "*").strip()
